@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "270784124565",
+    "project_id": "microredesocalgisotra",
+    "storage_bucket": "microredesocalgisotra.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:270784124565:android:cddb12e28c419b2c702d9c",
+        "android_client_info": {
+          "package_name": "br.com.ifsp.gisotra.microredesocial"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD26jXYR5kyS36BQRKp8nSXLYN2en_EkNY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
