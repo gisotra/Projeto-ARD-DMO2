@@ -36,7 +36,7 @@ class MainActivity : AppCompatActivity() {
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     if (firebaseAuth.currentUser != null) {
-                        startActivity(Intent(this, HomeActivity::class.java))
+                        startActivity(Intent(this, ProfileActivity::class.java))
                         finish()
                     }
                 } else {

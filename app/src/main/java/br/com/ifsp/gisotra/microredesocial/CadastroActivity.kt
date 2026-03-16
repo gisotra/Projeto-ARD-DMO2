@@ -10,56 +10,44 @@ import androidx.core.view.WindowInsetsCompat
 import br.com.ifsp.gisotra.microredesocial.databinding.ActivityCadastroBinding
 import br.com.ifsp.gisotra.microredesocial.databinding.ActivityMainBinding
 import com.google.firebase.auth.FirebaseAuth
-
 class CadastroActivity : AppCompatActivity() {
     private lateinit var binding: ActivityCadastroBinding
     private lateinit var firebaseAuth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContentView(R.layout.activity_cadastro)
+        binding = ActivityCadastroBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
         setupFirebase()
         setupListeners()
     }
 
-    fun setupFirebase(){
+    fun setupFirebase() {
         firebaseAuth = FirebaseAuth.getInstance()
-
-
-
     }
 
-    fun criarUsuario(){
-        val email = binding.etEmail.text.toString()
-        val password = binding.etPassword.text.toString()
-        val confirmar = binding.etPasswordValidation.text.toString()
+    fun criarUsuario() {
+        val email = binding.etEmail.text.toString().trim()
+        val password = binding.etPassword.text.toString().trim()
 
-        if(email.isEmpty() || password.isEmpty() || confirmar.isEmpty()){
-            Toast.makeText(this, "Preencha todos os campos", Toast.LENGTH_LONG).show()
-        }
-
-        if(password != confirmar){
-            Toast.makeText(this, "Senha digitada errada", Toast.LENGTH_LONG).show()
-        }
-
-        firebaseAuth
-            .signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    if (firebaseAuth.currentUser != null) {
+        if (email.isNotEmpty() && password.isNotEmpty()) {
+            firebaseAuth.createUserWithEmailAndPassword(email, password)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Toast.makeText(this, "Conta criada!", Toast.LENGTH_SHORT).show()
                         startActivity(Intent(this, MainActivity::class.java))
                         finish()
+                    } else {
+                        Toast.makeText(this, "Erro: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                     }
-                } else {
-                    Toast.makeText(this, "Erro na criação", Toast.LENGTH_LONG).show()
                 }
-            }
+        } else {
+            Toast.makeText(this, "Preencha os campos!", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    fun setupListeners(){
-        binding.btnCriar.setOnClickListener{(criarUsuario())}
-
+    fun setupListeners() {
+        binding.btnCriar.setOnClickListener { criarUsuario() }
     }
-
 }

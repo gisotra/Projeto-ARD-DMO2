@@ -22,13 +22,14 @@ class HomeActivity : AppCompatActivity() {
         setupListeners()
     }
 
-    fun sairDaActivity(){
-        startActivity(Intent(this, MainActivity::class.java))
+    fun Entrar(){
+        startActivity(Intent(this, ProfileActivity::class.java))
         finish()
     }
 
     fun setupListeners(){
-        binding.btnLogin.setOnClickListener{(sairDaActivity())}
+        binding.btnLogin.setOnClickListener{(Entrar())}
+
 
     }
 }
