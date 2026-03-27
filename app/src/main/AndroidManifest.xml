@@ -13,6 +13,18 @@
         android:theme="@style/Theme.Microredesocial"
         tools:targetApi="31">
         <activity
+            android:name=".PostageActivity"
+            android:exported="false" />
+        <activity
+            android:name=".service.AddPost"
+            android:exported="false" />
+        <activity
+            android:name=".adapter.PostageAdapter"
+            android:exported="false" />
+        <activity
+            android:name=".data.model.Postage"
+            android:exported="false" />
+        <activity
             android:name=".ProfileActivity"
             android:exported="false" />
         <activity
