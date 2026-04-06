@@ -1,6 +1,5 @@
-package br.com.ifsp.gisotra.microredesocial
+package br.com.ifsp.gisotra.microredesocial.ui
 
-import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge

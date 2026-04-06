@@ -13,28 +13,31 @@
         android:theme="@style/Theme.Microredesocial"
         tools:targetApi="31">
         <activity
-            android:name=".PostageActivity"
+            android:name=".service.AddPostActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.PostActivity"
             android:exported="false" />
         <activity
             android:name=".service.AddPost"
             android:exported="false" />
         <activity
-            android:name=".adapter.PostageAdapter"
+            android:name=".adapter.PostAdapter"
             android:exported="false" />
         <activity
-            android:name=".data.model.Postage"
+            android:name=".data.model.Post"
             android:exported="false" />
         <activity
-            android:name=".ProfileActivity"
+            android:name=".ui.ProfileActivity"
             android:exported="false" />
         <activity
-            android:name=".CadastroActivity"
+            android:name=".ui.CadastroActivity"
             android:exported="false" />
         <activity
-            android:name=".HomeActivity"
+            android:name=".ui.HomeActivity"
             android:exported="false" />
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
