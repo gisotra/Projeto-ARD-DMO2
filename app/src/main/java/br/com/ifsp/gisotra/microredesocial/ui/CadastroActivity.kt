@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import br.com.ifsp.gisotra.microredesocial.databinding.ActivityCadastroBinding
 import com.google.firebase.auth.FirebaseAuth
+
 class CadastroActivity : AppCompatActivity() {
     private lateinit var binding: ActivityCadastroBinding
     private lateinit var firebaseAuth: FirebaseAuth

@@ -12,8 +12,8 @@ import br.com.ifsp.gisotra.microredesocial.databinding.ActivityAddPostBinding
 import br.com.ifsp.gisotra.microredesocial.ui.HomeActivity
 import br.com.ifsp.gisotra.microredesocial.tool.Base64Converter
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FirebaseFirestore
 
 class AddPostActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAddPostBinding
