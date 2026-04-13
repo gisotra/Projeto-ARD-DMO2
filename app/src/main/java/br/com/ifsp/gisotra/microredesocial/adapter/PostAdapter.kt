@@ -4,23 +4,25 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import br.com.ifsp.gisotra.microredesocial.data.model.Post
+import br.com.ifsp.gisotra.microredesocial.databinding.ActivityPostBinding
 
 class PostAdapter(private val posts: MutableList<Post>) :
     RecyclerView.Adapter<PostAdapter.PostViewHolder>() {
 
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PostViewHolder {
-        val binding = PostItemBinding.inflate(
+        val binding = ActivityPostBinding.inflate(
             LayoutInflater.from(parent.context),
             parent,
             false
         )
         return PostViewHolder(binding)
     }
+    
+    class PostViewHolder(val binding: ActivityPostBinding) :
+        RecyclerView.ViewHolder(binding.root)
 
     override fun onBindViewHolder(holder: PostViewHolder, position: Int) {
         val post = posts[position]
-
         holder.binding.txtDescricao.text = post.descricao
         holder.binding.imgPost.setImageBitmap(post.imagem)
     }
