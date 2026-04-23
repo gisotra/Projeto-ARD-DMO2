@@ -4,7 +4,9 @@ import android.graphics.Bitmap
 import com.google.firebase.Timestamp
 
 data class Post (
-    val descricao: String,
-    val imagem: String,
-    val data: Timestamp
+    var descricao: String = "",
+    var imagem: String = "",
+    var data: Timestamp = Timestamp.now(),
+    var nomeAutor: String = "",
+    var cidade: String = ""
 )

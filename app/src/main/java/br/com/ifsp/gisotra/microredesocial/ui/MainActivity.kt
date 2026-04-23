@@ -9,71 +9,56 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import br.com.ifsp.gisotra.microredesocial.databinding.ActivityMainBinding
-import br.com.ifsp.gisotra.microredesocial.tool.LocalizacaoHelper
 import com.google.firebase.auth.FirebaseAuth
-import br.com.ifsp.gisotra.microredesocial.tool.LocalizacaoHelper.Callback
-
-    class MainActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
+    class MainActivity : AppCompatActivity() {
         private lateinit var binding : ActivityMainBinding
-        private val LOCATION_PERMISSION_REQUEST_CODE = 1001
+        private lateinit var auth: FirebaseAuth
+
         override fun onCreate(savedInstanceState: Bundle?) {
             super.onCreate(savedInstanceState)
             binding = ActivityMainBinding.inflate(layoutInflater)
             setContentView(binding.root)
-            binding.btnAtualizar.setOnClickListener {
-                solicitarLocalizacao()
+
+            auth = FirebaseAuth.getInstance()
+
+            // [RF1-4] Verifica se já tem alguém logado. Se sim, pula o login e vai pra Home.
+            if (auth.currentUser != null) {
+                irParaHome()
+            }
+
+            setupListeners()
+        }
+
+        private fun setupListeners() {
+            // IDs que você precisa ter no seu activity_main.xml: btnLogin, btnCriarConta, etEmail, etSenha
+            binding.btnLogin.setOnClickListener { fazerLogin() }
+
+            binding.btnCreateUser.setOnClickListener {
+                startActivity(Intent(this, CadastroActivity::class.java))
             }
         }
-        private fun solicitarLocalizacao() {
-            if (ActivityCompat.checkSelfPermission(
-                    this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED
-                &&
-                ActivityCompat.checkSelfPermission(
-                    this, Manifest.permission.ACCESS_COARSE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION),
-                    LOCATION_PERMISSION_REQUEST_CODE
-                )
+
+
+        private fun fazerLogin() {
+            val email = binding.etEmail.text.toString().trim()
+            val senha = binding.etPassword.text.toString().trim()
+
+            if (email.isNotEmpty() && senha.isNotEmpty()) {
+                auth.signInWithEmailAndPassword(email, senha)
+                    .addOnCompleteListener(this) { task ->
+                        if (task.isSuccessful) {
+                            irParaHome()
+                        } else {
+                            Toast.makeText(this, "Erro ao logar: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
             } else {
-                val localizacaoHelper = LocalizacaoHelper(applicationContext)
-                localizacaoHelper.obterLocalizacaoAtual(this)
+                Toast.makeText(this, "Preencha e-mail e senha", Toast.LENGTH_SHORT).show()
             }
         }
-        override fun onLocalizacaoRecebida(endereco: Address, latitude: Double,
-                                           longitude: Double) {
-            runOnUiThread {
-                var infos = endereco.locality
-                infos += "\n" + endereco.subLocality
-                infos += "\n" + endereco.adminArea
-                infos += "\n" + endereco.subAdminArea
-                infos += "\n" + endereco.postalCode
-                infos += "\n" + endereco.countryName + ", " + endereco.countryCode
-                infos += "\n" + endereco.getAddressLine(0)
-                binding.txtCidade.text = infos
-                binding.txtLongitudeLatitude.text = "Latitude: $latitude\nLongitude: $longitude"
-            }
-        }
-        override fun onErro(mensagem: String) {
-            System.out.println(mensagem)
-        }
-        override fun onRequestPermissionsResult(
-            requestCode: Int, permissions: Array<out String>, grantResults:
-            IntArray
-        ) {
-            super.onRequestPermissionsResult(requestCode, permissions,
-                grantResults)
-            if (requestCode == LOCATION_PERMISSION_REQUEST_CODE &&
-                grantResults.size > 0 &&
-                grantResults[0] == PackageManager.PERMISSION_GRANTED
-            ) {
-                solicitarLocalizacao()
-            } else {
-                Toast.makeText(this, "Permissão de localização negada",
-                    Toast.LENGTH_SHORT).show()
-            }
+
+        private fun irParaHome() {
+            startActivity(Intent(this, HomeActivity::class.java))
+            finish() // Finaliza a tela de login para o usuário não voltar pra cá se apertar o botão "Voltar"
         }
     }

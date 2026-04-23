@@ -40,20 +40,29 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
-    implementation(libs.firebase.auth)
+
+    // --- INÍCIO DA CONFIGURAÇÃO DO FIREBASE ---
+    // 1. O BoM entra aqui gerenciando as versões (usa a 32.8.0 ou superior)
+    implementation(platform("com.google.firebase:firebase-bom:32.8.0"))
+
+    // 2. Trocamos os 'libs.firebase' pela declaração direta em texto, SEM a versão no final
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    // --- FIM DA CONFIGURAÇÃO DO FIREBASE ---
+
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
-    implementation(libs.firebase.firestore.ktx)
+
     implementation(libs.play.services.location)
     implementation(libs.play.services.geocoder)
     implementation(libs.cronet.embedded)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
