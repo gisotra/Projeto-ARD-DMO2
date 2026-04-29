@@ -7,10 +7,12 @@ import androidx.appcompat.app.AppCompatActivity
 import br.com.ifsp.gisotra.microredesocial.databinding.ActivityCadastroBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.firestore.FirebaseFirestore // IMPORT NOVO
 
 class CadastroActivity : AppCompatActivity() {
     private lateinit var binding: ActivityCadastroBinding
     private lateinit var firebaseAuth: FirebaseAuth
+    private lateinit var db: FirebaseFirestore // VARIÁVEL DO FIRESTORE
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -21,11 +23,12 @@ class CadastroActivity : AppCompatActivity() {
         setupListeners()
     }
 
-    fun setupFirebase() {
+    private fun setupFirebase() {
         firebaseAuth = FirebaseAuth.getInstance()
+        db = FirebaseFirestore.getInstance() // INICIALIZANDO O FIRESTORE
     }
 
-    fun setupListeners() {
+    private fun setupListeners() {
         binding.btnCriar.setOnClickListener { criarUsuario() }
     }
 
@@ -35,13 +38,11 @@ class CadastroActivity : AppCompatActivity() {
         val password = binding.etPassword.text.toString().trim()
         val confirmaPassword = binding.etPasswordValidation.text.toString().trim()
 
-        // [RF1-2] Validando todos os campos requeridos
         if (nome.isEmpty() || email.isEmpty() || password.isEmpty() || confirmaPassword.isEmpty()) {
             Toast.makeText(this, "Preencha todos os campos!", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Validação extra de senha
         if (password != confirmaPassword) {
             Toast.makeText(this, "As senhas não coincidem!", Toast.LENGTH_SHORT).show()
             return
@@ -50,23 +51,36 @@ class CadastroActivity : AppCompatActivity() {
         firebaseAuth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    // Salvar o Nome do usuário no profile do Firebase Auth
                     val user = firebaseAuth.currentUser
+
                     val profileUpdates = UserProfileChangeRequest.Builder()
                         .setDisplayName(nome)
                         .build()
 
                     user?.updateProfile(profileUpdates)?.addOnCompleteListener {
-                        Toast.makeText(this, "Conta criada com sucesso!", Toast.LENGTH_SHORT).show()
-                        // Já manda pra Home e limpa a pilha de telas
-                        startActivity(Intent(this, HomeActivity::class.java))
-                        finishAffinity()
+
+                        val userData = hashMapOf(
+                            "nome" to nome,
+                            "email" to email,
+                            "foto" to ""
+                        )
+
+                        db.collection("users").document(email)
+                            .set(userData)
+                            .addOnSuccessListener {
+                                Toast.makeText(this, "Conta criada com sucesso!", Toast.LENGTH_SHORT).show()
+                                startActivity(Intent(this, HomeActivity::class.java))
+                                finish()
+                            }
+                            .addOnFailureListener { e ->
+                                Toast.makeText(this, "Erro ao salvar dados no banco: ${e.message}", Toast.LENGTH_LONG).show()
+                                startActivity(Intent(this, HomeActivity::class.java))
+                                finish()
+                            }
                     }
                 } else {
                     Toast.makeText(this, "Erro: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                 }
             }
     }
-
-
 }

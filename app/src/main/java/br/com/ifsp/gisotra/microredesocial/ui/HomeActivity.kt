@@ -1,7 +1,9 @@
 package br.com.ifsp.gisotra.microredesocial.ui
 
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.util.Base64
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -44,6 +46,39 @@ class HomeActivity : AppCompatActivity() {
         configurarBotoes()
         carregarPosts(false) // Carrega os primeiros 5 posts
     }
+
+    // Chama toda vez que a tela for reaberta (ex: voltando do Perfil)
+    override fun onResume() {
+        super.onResume()
+        carregarPerfilUsuario()
+    }
+
+    // --- NOVA FUNÇÃO: CARREGAR DADOS DO CABEÇALHO ---
+    private fun carregarPerfilUsuario() {
+        val email = auth.currentUser?.email
+
+        if (email != null) {
+            db.collection("users").document(email).get()
+                .addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        val nome = document.getString("nome") ?: "Usuário"
+                        binding.txtUserNameHome.text = "Olá, $nome!"
+
+                        val fotoBase64 = document.getString("foto")
+                        if (!fotoBase64.isNullOrEmpty()) {
+                            try {
+                                val imageBytes = Base64.decode(fotoBase64, Base64.DEFAULT)
+                                val decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                                binding.imgUserProfileHome.setImageBitmap(decodedImage)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                }
+        }
+    }
+    // ------------------------------------------------
 
     private fun configurarRecyclerView() {
         postAdapter = PostAdapter(listaDePosts)

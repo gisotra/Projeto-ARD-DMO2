@@ -1,12 +1,14 @@
 package br.com.ifsp.gisotra.microredesocial.service
 
-
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.location.Address
 import android.net.Uri
 import android.os.Bundle
+import android.util.Base64
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,25 +16,24 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import br.com.ifsp.gisotra.microredesocial.data.model.Post
 import br.com.ifsp.gisotra.microredesocial.databinding.ActivityAddPostBinding
-import br.com.ifsp.gisotra.microredesocial.ui.HomeActivity
-import br.com.ifsp.gisotra.microredesocial.tool.Base64Converter
 import br.com.ifsp.gisotra.microredesocial.tool.LocalizacaoHelper
-import com.google.firebase.auth.FirebaseAuth
+import br.com.ifsp.gisotra.microredesocial.ui.HomeActivity
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import java.io.ByteArrayOutputStream
 
 class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
     private lateinit var binding: ActivityAddPostBinding
     private val LOCATION_PERMISSION_REQUEST_CODE = 1001
 
-    private var cidadeAtual: String = ""
     private val galeria = registerForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
             binding.imgPost.setImageURI(uri)
         } else {
-            Toast.makeText(this, "Nenhuma foto selecionada", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Nenhuma foto selecionada", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -41,17 +42,14 @@ class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
         binding = ActivityAddPostBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Botão para pegar a foto
         binding.btnChangePhoto.setOnClickListener {
             galeria.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
 
-        // Botão para atualizar localização (Lembra de colocar esse botão no activity_add_post.xml!)
         binding.btnAtualizar.setOnClickListener {
             solicitarLocalizacao()
         }
 
-        // Botão de salvar
         binding.btnSave.setOnClickListener {
             salvarPost()
         }
@@ -63,31 +61,40 @@ class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
         val user = firebaseAuth.currentUser
 
         if (user != null) {
-            val descricao = binding.edtDescricao.text.toString()
+            val descricao = binding.edtDescricao.text.toString().trim()
+            val cidade = binding.edtCidade.text.toString().trim() // Pega a cidade que o cara digitou ou o GPS puxou
 
-            // Tratamento caso o usuário não tenha selecionado uma imagem
             if (binding.imgPost.drawable == null) {
-                Toast.makeText(this, "Selecione uma imagem!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Selecione uma foto!", Toast.LENGTH_SHORT).show()
                 return
             }
 
-            val fotoString = Base64Converter.drawableToString(binding.imgPost.drawable)
-
-            if (descricao.isBlank()) {
-                Toast.makeText(this, "Digite uma descrição", Toast.LENGTH_SHORT).show()
+            if (descricao.isEmpty() || cidade.isEmpty()) {
+                Toast.makeText(this, "Preencha a descrição e a cidade!", Toast.LENGTH_SHORT).show()
                 return
             }
 
-            // Usando a classe Post para enviar tudo pro Firestore de forma organizada!
+            // --- MAGIA DA COMPRESSÃO (Evita o Erro de 1MB do Firestore) ---
+            val bitmap = (binding.imgPost.drawable as BitmapDrawable).bitmap
+            // Reduz o tamanho da imagem para 500x500 (mantendo a proporção evita distorcer, mas aqui é um limite seguro)
+            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 500, 500, true)
+            val baos = ByteArrayOutputStream()
+            // Comprime para JPEG com 70% de qualidade
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+            val fotoString = Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT)
+            // ---------------------------------------------------------------
+
+            // Monta o objeto Post.
+            // AVISO: Se a sua coleção no Firebase se chama "post", mantenha "post". Se for "posts", mude aqui embaixo.
             val novoPost = Post(
                 descricao = descricao,
                 imagem = fotoString,
                 data = Timestamp.now(),
-                nomeAutor = user.displayName ?: "Usuário", // Pega o nome definido no RF1
-                cidade = cidadeAtual // Salva a cidade que o GPS achou
+                nomeAutor = user.displayName ?: "Usuário",
+                cidade = cidade
             )
 
-            // Salvando na coleção "post" (Igual a print que você mandou do console)
+            // Aqui eu coloquei "post" porque foi o que vi nas suas prints.
             db.collection("post")
                 .add(novoPost)
                 .addOnSuccessListener {
@@ -95,8 +102,8 @@ class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
                     startActivity(Intent(this, HomeActivity::class.java))
                     finish()
                 }
-                .addOnFailureListener {
-                    Toast.makeText(this, "Erro ao salvar o post", Toast.LENGTH_SHORT).show()
+                .addOnFailureListener { e ->
+                    Toast.makeText(this, "Erro ao salvar o post: ${e.message}", Toast.LENGTH_LONG).show()
                 }
         } else {
             Toast.makeText(this, "Usuário não autenticado", Toast.LENGTH_SHORT).show()
@@ -113,6 +120,7 @@ class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
                 LOCATION_PERMISSION_REQUEST_CODE
             )
         } else {
+            Toast.makeText(this, "Buscando...", Toast.LENGTH_SHORT).show()
             val localizacaoHelper = LocalizacaoHelper(applicationContext)
             localizacaoHelper.obterLocalizacaoAtual(this)
         }
@@ -120,12 +128,12 @@ class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
 
     override fun onLocalizacaoRecebida(endereco: Address, latitude: Double, longitude: Double) {
         runOnUiThread {
-            // Pega o nome da cidade. Se subAdminArea for nula, tenta adminArea
-            cidadeAtual = endereco.subAdminArea ?: endereco.adminArea ?: "Cidade Desconhecida"
+            // Tenta pegar a cidade, se não achar tenta o estado/condado
+            val cidadeAtual = endereco.subAdminArea ?: endereco.adminArea ?: "Desconhecido"
 
-            // Opcional: Atualizar um TextView na tela para o usuário ver a cidade
-            // binding.txtCidade.text = "Local: $cidadeAtual"
-            Toast.makeText(this, "Localização atualizada: $cidadeAtual", Toast.LENGTH_SHORT).show()
+            // JOGA O RESULTADO DO GPS DIRETO NO CAMPO DE TEXTO!
+            binding.edtCidade.setText(cidadeAtual)
+            Toast.makeText(this, "Localização atualizada!", Toast.LENGTH_SHORT).show()
         }
     }
 

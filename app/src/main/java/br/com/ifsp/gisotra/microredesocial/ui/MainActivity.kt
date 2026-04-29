@@ -21,12 +21,18 @@ import com.google.firebase.auth.FirebaseAuth
 
             auth = FirebaseAuth.getInstance()
 
-            // [RF1-4] Verifica se já tem alguém logado. Se sim, pula o login e vai pra Home.
-            if (auth.currentUser != null) {
-                irParaHome()
-            }
+
 
             setupListeners()
+        }
+
+        override fun onStart(){
+            super.onStart()
+
+            if (auth.currentUser != null) {
+                startActivity(Intent(this, HomeActivity::class.java))
+                finish()
+            }
         }
 
         private fun setupListeners() {
@@ -47,7 +53,7 @@ import com.google.firebase.auth.FirebaseAuth
                 auth.signInWithEmailAndPassword(email, senha)
                     .addOnCompleteListener(this) { task ->
                         if (task.isSuccessful) {
-                            irParaHome()
+                            startActivity(Intent(this, HomeActivity::class.java))
                         } else {
                             Toast.makeText(this, "Erro ao logar: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                         }
@@ -57,8 +63,4 @@ import com.google.firebase.auth.FirebaseAuth
             }
         }
 
-        private fun irParaHome() {
-            startActivity(Intent(this, HomeActivity::class.java))
-            finish() // Finaliza a tela de login para o usuário não voltar pra cá se apertar o botão "Voltar"
-        }
     }
