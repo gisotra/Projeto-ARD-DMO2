@@ -8,5 +8,7 @@ data class Post (
     var imagem: String = "",
     var data: Timestamp = Timestamp.now(),
     var nomeAutor: String = "",
-    var cidade: String = ""
+    var cidade: String = "",
+    val cidadeFiltro: String = "", // vou usar isso para ignorar caixa alta, acento, etc
+    val fotoAutor: String = ""
 )

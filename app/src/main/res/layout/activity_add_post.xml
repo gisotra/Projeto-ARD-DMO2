@@ -71,4 +71,15 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/btnAtualizar" />
 
+    <Button
+        android:id="@+id/btnVoltar"
+        android:layout_marginTop="90px"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="← Voltar"
+        style="?attr/materialButtonOutlinedStyle"
+        app:layout_constraintTop_toBottomOf="@id/btnSave"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

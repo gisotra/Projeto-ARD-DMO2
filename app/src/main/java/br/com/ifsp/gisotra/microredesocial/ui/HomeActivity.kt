@@ -7,7 +7,6 @@ import android.util.Base64
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import br.com.ifsp.gisotra.microredesocial.adapter.PostAdapter
 import br.com.ifsp.gisotra.microredesocial.data.model.Post
 import br.com.ifsp.gisotra.microredesocial.databinding.ActivityHomeBinding
@@ -24,18 +23,21 @@ class HomeActivity : AppCompatActivity() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    // Variáveis para a Paginação (RF3-1)
     private val listaDePosts = mutableListOf<Post>()
-    private var ultimoDocumento: DocumentSnapshot? = null
-    private var carregando = false
+
+    // --- VARIÁVEIS DE PAGINAÇÃO POR CURSOR ---
+    private val cursoresAnteriores = mutableListOf<DocumentSnapshot>()
+    private var ultimoDocumentoDaPagina: DocumentSnapshot? = null
+    private var paginaAtual = 1
+    private val LIMIT = 5L // Limite de 5 posts por vez
     private var isBuscandoPorCidade = false
+    private var cidadeBuscada = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Se por algum motivo o usuário não estiver logado, chuta ele pro Login
         if (auth.currentUser == null) {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
@@ -44,19 +46,16 @@ class HomeActivity : AppCompatActivity() {
 
         configurarRecyclerView()
         configurarBotoes()
-        carregarPosts(false) // Carrega os primeiros 5 posts
+        carregarPagina(null) // null significa: carregar a primeira página do zero
     }
 
-    // Chama toda vez que a tela for reaberta (ex: voltando do Perfil)
     override fun onResume() {
         super.onResume()
         carregarPerfilUsuario()
     }
 
-    // --- NOVA FUNÇÃO: CARREGAR DADOS DO CABEÇALHO ---
     private fun carregarPerfilUsuario() {
         val email = auth.currentUser?.email
-
         if (email != null) {
             db.collection("users").document(email).get()
                 .addOnSuccessListener { document ->
@@ -78,29 +77,15 @@ class HomeActivity : AppCompatActivity() {
                 }
         }
     }
-    // ------------------------------------------------
 
     private fun configurarRecyclerView() {
         postAdapter = PostAdapter(listaDePosts)
         binding.rvPosts.layoutManager = LinearLayoutManager(this)
         binding.rvPosts.adapter = postAdapter
-
-        // Lógica de Paginação: Quando chegar no final da lista, puxa mais 5
-        binding.rvPosts.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                super.onScrolled(recyclerView, dx, dy)
-                if (dy > 0 && !carregando && !isBuscandoPorCidade) {
-                    val layoutManager = recyclerView.layoutManager as LinearLayoutManager
-                    if (layoutManager.findLastCompletelyVisibleItemPosition() == listaDePosts.size - 1) {
-                        carregarPosts(false)
-                    }
-                }
-            }
-        })
+        // Scroll infinito foi removido daqui!
     }
 
     private fun configurarBotoes() {
-        // Navegação
         binding.btnNovoPost.setOnClickListener {
             startActivity(Intent(this, AddPostActivity::class.java))
         }
@@ -109,76 +94,106 @@ class HomeActivity : AppCompatActivity() {
             startActivity(Intent(this, ProfileActivity::class.java))
         }
 
-        // Busca por Cidade (RF3-2)
         binding.btnBuscar.setOnClickListener {
             val cidade = binding.edtBuscaCidade.text.toString().trim()
             if (cidade.isNotEmpty()) {
                 isBuscandoPorCidade = true
-                listaDePosts.clear()
-                postAdapter.notifyDataSetChanged()
-                buscarPostsPorCidade(cidade)
+                cidadeBuscada = normalizarTexto(cidade) // Limpa o texto antes de buscar!
+                carregarPagina(null)
             } else {
-                // Se esvaziar a busca, recarrega o feed normal
                 isBuscandoPorCidade = false
-                listaDePosts.clear()
-                ultimoDocumento = null
-                carregarPosts(true)
+                cidadeBuscada = ""
+                carregarPagina(null)
             }
+        }
+
+        // Botoes de Navegação
+        binding.btnAnterior.setOnClickListener {
+            carregarPagina(false) // Volta uma página
+        }
+
+        binding.btnProximo.setOnClickListener {
+            carregarPagina(true) // Avança uma página
         }
     }
 
-    private fun carregarPosts(limparLista: Boolean) {
-        if (carregando) return
-        carregando = true
+    // A MÁGICA DA PAGINAÇÃO POR CURSOR
+    private fun carregarPagina(avancar: Boolean?) {
+        // avancar = true (Próximo) | false (Anterior) | null (Resetar/Primeira)
 
-        if (limparLista) {
-            listaDePosts.clear()
-            ultimoDocumento = null
+        var query = db.collection("post").orderBy("data", Query.Direction.DESCENDING).limit(LIMIT)
+
+        // Usa o "cidadeFiltro" para a busca funcionar ignorando maiúsculas e acentos
+        if (isBuscandoPorCidade && cidadeBuscada.isNotEmpty()) {
+            query = db.collection("post")
+                .whereEqualTo("cidadeFiltro", cidadeBuscada)
+                .orderBy("data", Query.Direction.DESCENDING)
+                .limit(LIMIT)
         }
 
-        // Puxa do Firestore ordenado pela data, de 5 em 5 (RF3-1)
-        var query = db.collection("post")
-            .orderBy("data", Query.Direction.DESCENDING)
-            .limit(5)
-
-        if (ultimoDocumento != null) {
-            query = query.startAfter(ultimoDocumento!!)
+        if (avancar == true) {
+            // Se vai avançar, guarda o último item desta página para poder voltar depois
+            if (ultimoDocumentoDaPagina != null) {
+                cursoresAnteriores.add(ultimoDocumentoDaPagina!!)
+            }
+            paginaAtual++
+        } else if (avancar == false) {
+            // Se vai voltar, remove o último cursor da memória
+            if (cursoresAnteriores.isNotEmpty()) {
+                cursoresAnteriores.removeAt(cursoresAnteriores.size - 1)
+            }
+            paginaAtual--
+        } else {
+            // Se for null, limpa todo o histórico e reseta pra página 1
+            cursoresAnteriores.clear()
+            paginaAtual = 1
+            ultimoDocumentoDaPagina = null
         }
+
+        // Se a gente tem um cursor na memória, diz pro Firebase: "Começa a partir desse aqui"
+        if (cursoresAnteriores.isNotEmpty()) {
+            query = query.startAfter(cursoresAnteriores.last())
+        }
+
+        // Bloqueia os botões enquanto carrega para o usuário não clicar mil vezes
+        binding.btnAnterior.isEnabled = false
+        binding.btnProximo.isEnabled = false
 
         query.get().addOnSuccessListener { documentos ->
-            if (documentos.size() > 0) {
-                ultimoDocumento = documentos.documents[documentos.size() - 1]
+            listaDePosts.clear()
 
-                val novosPosts = mutableListOf<Post>()
+            if (documentos.size() > 0) {
+                // Atualiza a nossa referência de "último documento"
+                ultimoDocumentoDaPagina = documentos.documents[documentos.size() - 1]
+
                 for (doc in documentos) {
                     val post = doc.toObject(Post::class.java)
-                    novosPosts.add(post)
+                    listaDePosts.add(post)
                 }
-                postAdapter.adicionarPosts(novosPosts)
             }
-            carregando = false
+
+            postAdapter.notifyDataSetChanged()
+
+            // Atualiza os Textos e os Botões
+            binding.txtPaginaAtual.text = "Página $paginaAtual"
+
+            // Só pode voltar se a página for maior que 1
+            binding.btnAnterior.isEnabled = paginaAtual > 1
+
+            // Só pode avançar se o banco mandou EXATAMENTE 5. Se mandou 4 ou menos, é porque acabaram os posts.
+            binding.btnProximo.isEnabled = documentos.size() == LIMIT.toInt()
+
+            if (listaDePosts.isEmpty() && paginaAtual == 1) {
+                Toast.makeText(this, "Nenhum post encontrado", Toast.LENGTH_SHORT).show()
+            }
         }.addOnFailureListener {
             Toast.makeText(this, "Erro ao carregar feed", Toast.LENGTH_SHORT).show()
-            carregando = false
         }
     }
 
-    private fun buscarPostsPorCidade(cidade: String) {
-        // Busca exata pelo nome da cidade no Firebase
-        db.collection("post")
-            .whereEqualTo("cidade", cidade)
-            .get()
-            .addOnSuccessListener { documentos ->
-                val postsDaCidade = mutableListOf<Post>()
-                for (doc in documentos) {
-                    val post = doc.toObject(Post::class.java)
-                    postsDaCidade.add(post)
-                }
-                if (postsDaCidade.isEmpty()) {
-                    Toast.makeText(this, "Nenhum post nessa cidade", Toast.LENGTH_SHORT).show()
-                } else {
-                    postAdapter.adicionarPosts(postsDaCidade)
-                }
-            }
+    private fun normalizarTexto(texto: String): String {
+        val semAcento = java.text.Normalizer.normalize(texto, java.text.Normalizer.Form.NFD)
+            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        return semAcento.lowercase().trim()
     }
 }

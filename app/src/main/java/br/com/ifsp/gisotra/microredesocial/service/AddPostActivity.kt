@@ -53,6 +53,10 @@ class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
         binding.btnSave.setOnClickListener {
             salvarPost()
         }
+
+        binding.btnVoltar.setOnClickListener {
+            finish()
+        }
     }
 
     private fun salvarPost() {
@@ -61,8 +65,10 @@ class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
         val user = firebaseAuth.currentUser
 
         if (user != null) {
+            val emailUsuario = user.email ?: return // Pegamos o e-mail para buscar a foto depois
+
             val descricao = binding.edtDescricao.text.toString().trim()
-            val cidade = binding.edtCidade.text.toString().trim() // Pega a cidade que o cara digitou ou o GPS puxou
+            val cidade = binding.edtCidade.text.toString().trim()
 
             if (binding.imgPost.drawable == null) {
                 Toast.makeText(this, "Selecione uma foto!", Toast.LENGTH_SHORT).show()
@@ -76,35 +82,43 @@ class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
 
             // --- MAGIA DA COMPRESSÃO (Evita o Erro de 1MB do Firestore) ---
             val bitmap = (binding.imgPost.drawable as BitmapDrawable).bitmap
-            // Reduz o tamanho da imagem para 500x500 (mantendo a proporção evita distorcer, mas aqui é um limite seguro)
             val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 500, 500, true)
             val baos = ByteArrayOutputStream()
-            // Comprime para JPEG com 70% de qualidade
             scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
             val fotoString = Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT)
             // ---------------------------------------------------------------
 
-            // Monta o objeto Post.
-            // AVISO: Se a sua coleção no Firebase se chama "post", mantenha "post". Se for "posts", mude aqui embaixo.
-            val novoPost = Post(
-                descricao = descricao,
-                imagem = fotoString,
-                data = Timestamp.now(),
-                nomeAutor = user.displayName ?: "Usuário",
-                cidade = cidade
-            )
+            // 1. Busca a foto do dono da postagem lá na coleção "users"
+            db.collection("users").document(emailUsuario).get().addOnSuccessListener { document ->
+                // Pega a foto de perfil em Base64. Se não tiver, fica uma String vazia ""
+                val fotoDoAutorBase64 = document.getString("foto") ?: ""
 
-            // Aqui eu coloquei "post" porque foi o que vi nas suas prints.
-            db.collection("post")
-                .add(novoPost)
-                .addOnSuccessListener {
-                    Toast.makeText(this, "Post salvo com sucesso!", Toast.LENGTH_SHORT).show()
-                    startActivity(Intent(this, HomeActivity::class.java))
-                    finish()
-                }
-                .addOnFailureListener { e ->
-                    Toast.makeText(this, "Erro ao salvar o post: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                // 2. Monta o objeto Post. AGORA COM A FOTO DO AUTOR!
+                val novoPost = Post(
+                    descricao = descricao,
+                    imagem = fotoString,
+                    data = Timestamp.now(),
+                    nomeAutor = user.displayName ?: "Usuário",
+                    cidade = cidade,
+                    cidadeFiltro = normalizarTexto(cidade),
+                    fotoAutor = fotoDoAutorBase64 // <-- INSERIMOS A FOTO AQUI
+                )
+
+                // 3. Salva na coleção "post"
+                db.collection("post")
+                    .add(novoPost)
+                    .addOnSuccessListener {
+                        Toast.makeText(this, "Post salvo com sucesso!", Toast.LENGTH_SHORT).show()
+                        startActivity(Intent(this, HomeActivity::class.java))
+                        finish()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(this, "Erro ao salvar o post: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+            }.addOnFailureListener {
+                Toast.makeText(this, "Erro ao carregar perfil do usuário para o post", Toast.LENGTH_SHORT).show()
+            }
+
         } else {
             Toast.makeText(this, "Usuário não autenticado", Toast.LENGTH_SHORT).show()
         }
@@ -128,10 +142,9 @@ class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
 
     override fun onLocalizacaoRecebida(endereco: Address, latitude: Double, longitude: Double) {
         runOnUiThread {
-            // Tenta pegar a cidade, se não achar tenta o estado/condado
-            val cidadeAtual = endereco.subAdminArea ?: endereco.adminArea ?: "Desconhecido"
+            // Tenta pegar 'locality' primeiro. Se for nulo, tenta 'subAdminArea'. Se der ruim, põe Desconhecido.
+            val cidadeAtual = endereco.locality ?: endereco.subAdminArea ?: endereco.adminArea ?: "Desconhecido"
 
-            // JOGA O RESULTADO DO GPS DIRETO NO CAMPO DE TEXTO!
             binding.edtCidade.setText(cidadeAtual)
             Toast.makeText(this, "Localização atualizada!", Toast.LENGTH_SHORT).show()
         }
@@ -148,5 +161,12 @@ class AddPostActivity : AppCompatActivity(), LocalizacaoHelper.Callback {
         } else {
             Toast.makeText(this, "Permissão de localização negada", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    // lidar com acentos, caixa alta, etc
+    private fun normalizarTexto(texto: String): String {
+        val semAcento = java.text.Normalizer.normalize(texto, java.text.Normalizer.Form.NFD)
+            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        return semAcento.lowercase().trim()
     }
 }

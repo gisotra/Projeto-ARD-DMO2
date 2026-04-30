@@ -5,6 +5,7 @@ import android.util.Base64
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import br.com.ifsp.gisotra.microredesocial.R // Adicionei o import do R para puxar a foto padrão
 import br.com.ifsp.gisotra.microredesocial.data.model.Post
 import br.com.ifsp.gisotra.microredesocial.databinding.ItemPostBinding
 
@@ -20,12 +21,28 @@ class PostAdapter(private val listaDePosts: MutableList<Post>) : RecyclerView.Ad
     override fun onBindViewHolder(holder: PostViewHolder, position: Int) {
         val post = listaDePosts[position]
 
-        // 1. Amarra os textos que estavam faltando
+        // 1. Amarra os textos
         holder.binding.txtNomeAutor.text = post.nomeAutor
         holder.binding.txtCidade.text = "📍 ${post.cidade}"
         holder.binding.txtDescricao.text = post.descricao
 
-        // 2. Transforma o Base64 de volta pra imagem
+        // 2. FOTO DO AUTOR (Nova lógica aqui!)
+        if (!post.fotoAutor.isNullOrEmpty()) {
+            try {
+                val imageBytes = Base64.decode(post.fotoAutor, Base64.DEFAULT)
+                val decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                holder.binding.imgFotoAutorPost.setImageBitmap(decodedImage)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Se der erro ao carregar, põe a imagem padrão
+                holder.binding.imgFotoAutorPost.setImageResource(R.drawable.ic_launcher_foreground)
+            }
+        } else {
+            // Se o cara não tiver foto de perfil, põe a imagem padrão
+            holder.binding.imgFotoAutorPost.setImageResource(R.drawable.ic_launcher_foreground)
+        }
+
+        // 3. FOTO GRANDE DO POST (Sua lógica original)
         if (!post.imagem.isNullOrEmpty()) {
             try {
                 val imageBytes = Base64.decode(post.imagem, Base64.DEFAULT)
@@ -33,11 +50,8 @@ class PostAdapter(private val listaDePosts: MutableList<Post>) : RecyclerView.Ad
                 holder.binding.imgPost.setImageBitmap(decodedImage)
             } catch (e: Exception) {
                 e.printStackTrace()
-                // Aqui você poderia colocar uma imagem de erro padrão se quisesse
             }
         }
-
-        // POST NÃO É MAIS CLICÁVEL! Aquele bloco do setOnClickListener foi apagado daqui.
     }
 
     override fun getItemCount(): Int {

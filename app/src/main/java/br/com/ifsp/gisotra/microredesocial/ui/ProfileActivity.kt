@@ -87,6 +87,10 @@ class ProfileActivity : AppCompatActivity() {
             startActivity(intent)
             finish()
         }
+
+        binding.btnVoltar.setOnClickListener {
+            finish()
+        }
     }
 
     private fun salvarAlteracoes() {
