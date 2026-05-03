@@ -15,6 +15,7 @@ import br.com.ifsp.gisotra.microredesocial.databinding.ActivityProfileBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import java.io.ByteArrayOutputStream
 
 class ProfileActivity : AppCompatActivity() {
@@ -50,11 +51,10 @@ class ProfileActivity : AppCompatActivity() {
             val emailUsuario = user.email
 
             if (emailUsuario != null) {
-                // BUSCA PELO E-MAIL (Igual fizemos no cadastro!)
+                // Busca os dados complementares no Firestore
                 db.collection("users").document(emailUsuario).get()
                     .addOnSuccessListener { document ->
                         if (document.exists()) {
-                            // O NOME DO CAMPO É "foto" (igual no cadastro)
                             val fotoBase64 = document.getString("foto")
                             if (!fotoBase64.isNullOrEmpty()) {
                                 try {
@@ -97,65 +97,72 @@ class ProfileActivity : AppCompatActivity() {
         val user = auth.currentUser ?: return
         val novoNome = binding.edtProfileName.text.toString().trim()
         val novaSenha = binding.edtProfilePassword.text.toString().trim()
+        val emailUsuario = user.email ?: return
 
         if (novoNome.isEmpty()) {
             Toast.makeText(this, "O nome não pode ficar vazio!", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // 1. Atualiza o Nome no Firebase Auth
-        val profileUpdates = UserProfileChangeRequest.Builder()
-            .setDisplayName(novoNome)
-            .build()
+        // 1. Prepara o pacote de dados para o Firestore
+        val dadosAtualizados = hashMapOf<String, Any>(
+            "nome" to novoNome
+        )
 
-        user.updateProfile(profileUpdates).addOnFailureListener {
-            Toast.makeText(this, "Erro ao atualizar nome", Toast.LENGTH_SHORT).show()
-        }
-
-        // 2. Atualiza o Nome no Firestore também
-        val emailUsuario = user.email
-        if (emailUsuario != null) {
-            db.collection("users").document(emailUsuario).update("nome", novoNome)
-        }
-
-        // 3. Atualiza a Senha
-        if (novaSenha.isNotEmpty()) {
-            if (novaSenha.length >= 6) {
-                user.updatePassword(novaSenha).addOnFailureListener {
-                    Toast.makeText(this, "Erro ao atualizar senha. Logue novamente.", Toast.LENGTH_LONG).show()
-                }
-            } else {
-                Toast.makeText(this, "A senha deve ter pelo menos 6 caracteres", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-// 4. COMPRIME E SALVA A FOTO NO FIRESTORE
-        if (binding.imgProfile.drawable != null && emailUsuario != null) {
+        // 2. Comprime e anexa a foto no pacote (se houver foto)
+        if (binding.imgProfile.drawable != null) {
             try {
                 val bitmap = (binding.imgProfile.drawable as BitmapDrawable).bitmap
                 val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 400, 400, true)
                 val baos = ByteArrayOutputStream()
                 scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
                 val fotoString = Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT)
+                dadosAtualizados["foto"] = fotoString
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
 
-                // MUDANÇA AQUI: Usando o SetOptions.merge() para não dar erro se o documento não existir
-                val dadosAtualizados = hashMapOf("foto" to fotoString)
+        // 3. Inicia a atualização oficial do perfil no Auth
+        val profileUpdates = UserProfileChangeRequest.Builder()
+            .setDisplayName(novoNome)
+            .build()
 
+        user.updateProfile(profileUpdates).addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+
+                // 4. Se o Auth atualizou, envia o pacote com Nome e Foto pro Firestore tudo de uma vez
                 db.collection("users").document(emailUsuario)
-                    .set(dadosAtualizados, com.google.firebase.firestore.SetOptions.merge()) // <-- O PULO DO GATO
+                    .set(dadosAtualizados, SetOptions.merge())
                     .addOnSuccessListener {
-                        Toast.makeText(this, "Perfil atualizado com sucesso!", Toast.LENGTH_SHORT).show()
-                        finish()
+
+                        // 5. Por último, resolve a senha (se o usuário digitou alguma)
+                        if (novaSenha.isNotEmpty()) {
+                            if (novaSenha.length >= 6) {
+                                user.updatePassword(novaSenha).addOnCompleteListener { senhaTask ->
+                                    if (senhaTask.isSuccessful) {
+                                        Toast.makeText(this, "Perfil e senha atualizados!", Toast.LENGTH_SHORT).show()
+                                        finish()
+                                    } else {
+                                        Toast.makeText(this, "Perfil salvo, mas houve erro na senha.", Toast.LENGTH_LONG).show()
+                                        finish()
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(this, "A senha deve ter pelo menos 6 caracteres", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            // Se não digitou senha, encerra com sucesso!
+                            Toast.makeText(this, "Perfil atualizado com sucesso!", Toast.LENGTH_SHORT).show()
+                            finish()
+                        }
                     }
                     .addOnFailureListener {
-                        Toast.makeText(this, "Erro ao salvar foto no banco", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Erro ao salvar dados no Firestore", Toast.LENGTH_SHORT).show()
                     }
-            } catch (e: Exception) {
-                Toast.makeText(this, "Erro ao processar imagem", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Erro ao atualizar nome na conta (Auth)", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            Toast.makeText(this, "Perfil atualizado com sucesso!", Toast.LENGTH_SHORT).show()
-            finish()
         }
     }
 }
