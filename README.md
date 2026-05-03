@@ -14,9 +14,7 @@ O **Micro Rede Social** é um aplicativo mobile focado no compartilhamento de mo
 - **Busca Inteligente:** Filtro de postagens por cidade que ignora acentuação e letras maiúsculas/minúsculas (técnica de desnormalização de dados).
 
 ## 🎥 Demonstração
-
-<!-- DICA: Grave um vídeo no Android Studio conforme as instruções do Professor, suba no YouTube ou arraste o arquivo .mp4 direto aqui pro GitHub e substitua o link abaixo! -->
-[![Assista à demonstração](aindanãotemvídeo:P)
+[![Assista à demonstração]()
 
 *Acima: Vídeo demonstrando o fluxo de login, criação de postagem com GPS e busca no feed.*
 
